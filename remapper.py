@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import time
 import evdev
 from evdev import ecodes,AbsInfo,UInput
 
@@ -27,97 +28,111 @@ def print_capabilities(device):
             else:
                 # Multiple names may resolve to one value.
                 s = ', '.join(code[0]) if isinstance(code[0], list) else code[0]
-                print('    Code {:<4} {}'.format(s, code[1]))
+                print(f"    Code {s} {code[1]}")
         print('')
 
 
-devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
+def find_trackball():
+	devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
 
-trackball = None
+	trackball = None
 
-for dev in devices:
-	if "Logitech USB Trackball" in dev.name:
-		trackball = dev
-		break
+	for dev in devices:
+		print(dev)
+		if "Logitech USB Trackball" in dev.name:
+			trackball = dev
+			break
 
-if trackball is None:
-	print("No trackball found, exitting")
-	exit(1)
+	if trackball is None:
+		print("No trackball found")
+		return (None,None)
 
-print_capabilities(trackball)
-trackball.grab()
-trackball_cap = trackball.capabilities()
-capabilities = trackball.capabilities()
-del capabilities[ecodes.EV_SYN] # Without this it fails 
-capabilities[ecodes.EV_REL].append(ecodes.REL_HWHEEL)
-capabilities[ecodes.EV_REL].append(ecodes.REL_WHEEL)
-capabilities[ecodes.EV_REL].append(ecodes.REL_HWHEEL_HI_RES)
-capabilities[ecodes.EV_REL].append(ecodes.REL_WHEEL_HI_RES)
-out = UInput(events=capabilities, name='Trackball remapped')
-print(out.capabilities(verbose=True))
+	print_capabilities(trackball)
+	trackball.grab()
+	trackball_cap = trackball.capabilities()
+	capabilities = trackball.capabilities()
+	del capabilities[ecodes.EV_SYN] # Without this it fails 
+	capabilities[ecodes.EV_REL].append(ecodes.REL_HWHEEL)
+	capabilities[ecodes.EV_REL].append(ecodes.REL_WHEEL)
+	capabilities[ecodes.EV_REL].append(ecodes.REL_HWHEEL_HI_RES)
+	capabilities[ecodes.EV_REL].append(ecodes.REL_WHEEL_HI_RES)
+	out = UInput(events=capabilities, name='Trackball remapped')
+	print(out.capabilities(verbose=True))
+	return (trackball, out)
 
-WHEEL_THRESHOLD = 5
-HWHEEL_THRESHOLD = 5
+def event_loop(trackbal,out): 
+	WHEEL_THRESHOLD = 5
+	HWHEEL_THRESHOLD = 5
 
-scrolling = False
-scrolled = False
-mem_down = None
-wheel_accum = 0
-hwheel_accum = 0
-for event in trackball.read_loop():
-	print(evdev.categorize(event))
-	match event.type:
-		case ecodes.EV_SYN:
-			print("Sync")
-			out.write_event(event)
-		case ecodes.EV_KEY:
-			match event.code:
-				case ecodes.BTN_RIGHT:
-					event.code = ecodes.BTN_LEFT
-					out.write_event(event)
-				case ecodes.BTN_LEFT:
-					event.code = ecodes.BTN_RIGHT
-					out.write_event(event)
-				case ecodes.BTN_SIDE:
-					out.write_event(event)
-				case ecodes.BTN_EXTRA:
-					event.code = ecodes.BTN_MIDDLE
-					if event.value == 1: # Pressed
-						scrolling = True
-						mem_down = event
-					elif event.value == 0:
-						scrolling = False
-						if not scrolled:
-							if mem_down is not None:
-								out.write_event(mem_down)
-								out.syn()
-								mem_down = None
-							out.write_event(event)
-						scrolled = False
-			print("Key")
-			pass
-		case ecodes.EV_REL:
-			print("Rel")
-			if not scrolling:
+	scrolling = False
+	scrolled = False
+	mem_down = None
+	wheel_accum = 0
+	hwheel_accum = 0
+	for event in trackball.read_loop():
+		print(evdev.categorize(event))
+		match event.type:
+			case ecodes.EV_SYN:
+				print("Sync")
 				out.write_event(event)
-			else:
-				scrolled = True
-				if event.code == ecodes.REL_X:
-					hwheel_accum += event.value
-					if abs(hwheel_accum) > HWHEEL_THRESHOLD:
-						event.code = ecodes.REL_HWHEEL
-						event.value = (hwheel_accum//HWHEEL_THRESHOLD)
-						hwheel_accum %= HWHEEL_THRESHOLD
+			case ecodes.EV_KEY:
+				match event.code:
+					case ecodes.BTN_RIGHT:
+						event.code = ecodes.BTN_LEFT
 						out.write_event(event)
-				elif event.code == ecodes.REL_Y:
-					wheel_accum += event.value
-					if abs(wheel_accum) > WHEEL_THRESHOLD:
-						event.code = ecodes.REL_WHEEL
-						event.value = -(wheel_accum//WHEEL_THRESHOLD)
-						wheel_accum %= WHEEL_THRESHOLD
+					case ecodes.BTN_LEFT:
+						event.code = ecodes.BTN_RIGHT
 						out.write_event(event)
+					case ecodes.BTN_SIDE:
+						out.write_event(event)
+					case ecodes.BTN_EXTRA:
+						event.code = ecodes.BTN_MIDDLE
+						if event.value == 1: # Pressed
+							scrolling = True
+							mem_down = event
+						elif event.value == 0:
+							scrolling = False
+							if not scrolled:
+								if mem_down is not None:
+									out.write_event(mem_down)
+									out.syn()
+									mem_down = None
+								out.write_event(event)
+							scrolled = False
+				print("Key")
+				pass
+			case ecodes.EV_REL:
+				print("Rel")
+				if not scrolling:
+					out.write_event(event)
+				else:
+					scrolled = True
+					if event.code == ecodes.REL_X:
+						hwheel_accum += event.value
+						if abs(hwheel_accum) > HWHEEL_THRESHOLD:
+							event.code = ecodes.REL_HWHEEL
+							event.value = (hwheel_accum//HWHEEL_THRESHOLD)
+							hwheel_accum %= HWHEEL_THRESHOLD
+							out.write_event(event)
+					elif event.code == ecodes.REL_Y:
+						wheel_accum += event.value
+						if abs(wheel_accum) > WHEEL_THRESHOLD:
+							event.code = ecodes.REL_WHEEL
+							event.value = -(wheel_accum//WHEEL_THRESHOLD)
+							wheel_accum %= WHEEL_THRESHOLD
+							out.write_event(event)
 
-		case ecodes.EV_MSC:
-			print("Msc")
-			out.write_event(event)
-#	out.syn()
+			case ecodes.EV_MSC:
+				print("Msc")
+				out.write_event(event)
+	#	out.syn()
+
+if __name__ == "__main__":
+	while True:
+		trackball, out = find_trackball()
+		if trackball is not None and out is not None:
+			try:
+				event_loop(trackball, out)
+			except OSError as e:
+				print(e)
+		time.sleep(3)
