@@ -5,31 +5,31 @@ import evdev
 from evdev import ecodes,AbsInfo,UInput
 
 def print_capabilities(device):
-    capabilities = device.capabilities(verbose=True)
+	capabilities = device.capabilities(verbose=True)
 
-    print('Device name: {.name}'.format(device))
-    print('Device info: {.info}'.format(device))
+	print('Device name: {.name}'.format(device))
+	print('Device info: {.info}'.format(device))
 
-    if ('EV_LED', ecodes.EV_LED) in capabilities:
-        leds = ','.join(i[0] for i in device.leds(True))
-        print('Active LEDs: %s' % leds)
+	if ('EV_LED', ecodes.EV_LED) in capabilities:
+		leds = ','.join(i[0] for i in device.leds(True))
+		print('Active LEDs: %s' % leds)
 
-    active_keys = ','.join(k[0] for k in device.active_keys(True))
-    print('Active keys: %s\n' % active_keys)
+	active_keys = ','.join(k[0] for k in device.active_keys(True))
+	print('Active keys: %s\n' % active_keys)
 
-    print('Device capabilities:')
-    for type, codes in capabilities.items():
-        print('  Type {} {}:'.format(*type))
-        for code in codes:
-            # code <- ('BTN_RIGHT', 273) or (['BTN_LEFT', 'BTN_MOUSE'], 272)
-            if isinstance(code[1], AbsInfo):
-                print('    Code {:<4} {}:'.format(*code[0]))
-                print('      {}'.format(code[1]))
-            else:
-                # Multiple names may resolve to one value.
-                s = ', '.join(code[0]) if isinstance(code[0], list) else code[0]
-                print(f"    Code {s} {code[1]}")
-        print('')
+	print('Device capabilities:')
+	for type, codes in capabilities.items():
+		print('  Type {} {}:'.format(*type))
+		for code in codes:
+			# code <- ('BTN_RIGHT', 273) or (['BTN_LEFT', 'BTN_MOUSE'], 272)
+			if isinstance(code[1], AbsInfo):
+				print('	Code {:<4} {}:'.format(*code[0]))
+				print('	  {}'.format(code[1]))
+			else:
+				# Multiple names may resolve to one value.
+				s = ', '.join(code[0]) if isinstance(code[0], list) else code[0]
+				print(f"	Code {s} {code[1]}")
+		print('')
 
 
 def find_trackball():
