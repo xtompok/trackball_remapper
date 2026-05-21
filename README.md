@@ -12,6 +12,7 @@ Python evdev script for remapping buttons of Logitech Trakball Marble
 
 ## Usage
  - `sudo python3 remapper.py`
+ - Debug logging: `sudo python3 remapper.py --debug`
 
 ## Autostart on boot (systemd)
 1. Copy the project to a stable location (the service expects `/opt/trackball_remapper`):

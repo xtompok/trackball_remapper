@@ -1,35 +1,50 @@
 #!/usr/bin/env python3
 
+import argparse
+import logging
 import time
+from collections.abc import Sequence
+from typing import cast
 import evdev
 from evdev import ecodes,AbsInfo,UInput
+
+logger = logging.getLogger(__name__)
+
+
+def parse_args():
+	parser = argparse.ArgumentParser(description='Logitech Trackball remapper')
+	parser.add_argument(
+		'--debug',
+		action='store_true',
+		help='Enable verbose debug logging'
+	)
+	return parser.parse_args()
 
 def print_capabilities(device):
 	capabilities = device.capabilities(verbose=True)
 
-	print('Device name: {.name}'.format(device))
-	print('Device info: {.info}'.format(device))
+	logger.info('Device name: %s', device.name)
+	logger.info('Device info: %s', device.info)
 
 	if ('EV_LED', ecodes.EV_LED) in capabilities:
 		leds = ','.join(i[0] for i in device.leds(True))
-		print('Active LEDs: %s' % leds)
+		logger.info('Active LEDs: %s', leds)
 
 	active_keys = ','.join(k[0] for k in device.active_keys(True))
-	print('Active keys: %s\n' % active_keys)
+	logger.info('Active keys: %s', active_keys)
 
-	print('Device capabilities:')
+	logger.info('Device capabilities:')
 	for type, codes in capabilities.items():
-		print('  Type {} {}:'.format(*type))
+		logger.info('  Type %s %s:', *type)
 		for code in codes:
 			# code <- ('BTN_RIGHT', 273) or (['BTN_LEFT', 'BTN_MOUSE'], 272)
 			if isinstance(code[1], AbsInfo):
-				print('	Code {:<4} {}:'.format(*code[0]))
-				print('	  {}'.format(code[1]))
+				logger.info('    Code %-4s %s:', *code[0])
+				logger.info('      %s', code[1])
 			else:
 				# Multiple names may resolve to one value.
 				s = ', '.join(code[0]) if isinstance(code[0], list) else code[0]
-				print(f"	Code {s} {code[1]}")
-		print('')
+				logger.info('    Code %s %s', s, code[1])
 
 
 def find_trackball():
@@ -38,13 +53,13 @@ def find_trackball():
 	trackball = None
 
 	for dev in devices:
-		print(dev)
+		logger.debug('%s', dev)
 		if "Logitech USB Trackball" in dev.name:
 			trackball = dev
 			break
 
 	if trackball is None:
-		print("No trackball found")
+		logger.warning('No trackball found')
 		return (None,None)
 
 	print_capabilities(trackball)
@@ -56,8 +71,9 @@ def find_trackball():
 		capabilities[ecodes.EV_REL].append(ecodes.REL_HWHEEL)
 	if ecodes.REL_WHEEL not in capabilities[ecodes.EV_REL]:
 		capabilities[ecodes.EV_REL].append(ecodes.REL_WHEEL)
-	out = UInput(events=capabilities, name='Trackball remapped')
-	print(out.capabilities(verbose=True))
+	uinput_events = cast(dict[int, Sequence[int]], capabilities)
+	out = UInput(events=uinput_events, name='Trackball remapped')
+	logger.debug('%s', out.capabilities(verbose=True))
 	return (trackball, out)
 
 def event_loop(trackball,out): 
@@ -70,10 +86,10 @@ def event_loop(trackball,out):
 	wheel_accum = 0
 	hwheel_accum = 0
 	for event in trackball.read_loop():
-		print(evdev.categorize(event))
+		logger.debug('%s', evdev.categorize(event))
 		match event.type:
 			case ecodes.EV_SYN:
-				print("Sync")
+				logger.debug('Sync')
 				out.write_event(event)
 			case ecodes.EV_KEY:
 				match event.code:
@@ -99,10 +115,10 @@ def event_loop(trackball,out):
 									mem_down = None
 								out.write_event(event)
 							scrolled = False
-				print("Key")
+				logger.debug('Key')
 				pass
 			case ecodes.EV_REL:
-				print("Rel")
+				logger.debug('Rel')
 				if not scrolling:
 					out.write_event(event)
 				else:
@@ -123,16 +139,21 @@ def event_loop(trackball,out):
 							out.write_event(event)
 
 			case ecodes.EV_MSC:
-				print("Msc")
+				logger.debug('Msc')
 				out.write_event(event)
 	#	out.syn()
 
 if __name__ == "__main__":
+	args = parse_args()
+	logging.basicConfig(
+		level=logging.DEBUG if args.debug else logging.INFO,
+		format='%(asctime)s %(levelname)s %(name)s: %(message)s'
+	)
 	while True:
 		trackball, out = find_trackball()
 		if trackball is not None and out is not None:
 			try:
 				event_loop(trackball, out)
 			except OSError as e:
-				print(e)
+				logger.error('%s', e)
 		time.sleep(3)
