@@ -1,0 +1,14 @@
+[Unit]
+Description=Trackball Remapper
+After=systemd-udevd.service
+Wants=systemd-udevd.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/trackball_remapper
+ExecStart=/usr/bin/python3 /opt/trackball_remapper/remapper.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

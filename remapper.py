@@ -52,15 +52,15 @@ def find_trackball():
 	trackball_cap = trackball.capabilities()
 	capabilities = trackball.capabilities()
 	del capabilities[ecodes.EV_SYN] # Without this it fails 
-	capabilities[ecodes.EV_REL].append(ecodes.REL_HWHEEL)
-	capabilities[ecodes.EV_REL].append(ecodes.REL_WHEEL)
-	capabilities[ecodes.EV_REL].append(ecodes.REL_HWHEEL_HI_RES)
-	capabilities[ecodes.EV_REL].append(ecodes.REL_WHEEL_HI_RES)
+	if ecodes.REL_HWHEEL not in capabilities[ecodes.EV_REL]:
+		capabilities[ecodes.EV_REL].append(ecodes.REL_HWHEEL)
+	if ecodes.REL_WHEEL not in capabilities[ecodes.EV_REL]:
+		capabilities[ecodes.EV_REL].append(ecodes.REL_WHEEL)
 	out = UInput(events=capabilities, name='Trackball remapped')
 	print(out.capabilities(verbose=True))
 	return (trackball, out)
 
-def event_loop(trackbal,out): 
+def event_loop(trackball,out): 
 	WHEEL_THRESHOLD = 5
 	HWHEEL_THRESHOLD = 5
 

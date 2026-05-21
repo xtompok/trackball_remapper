@@ -12,3 +12,19 @@ Python evdev script for remapping buttons of Logitech Trakball Marble
 
 ## Usage
  - `sudo python3 remapper.py`
+
+## Autostart on boot (systemd)
+1. Copy the project to a stable location (the service expects `/opt/trackball_remapper`):
+    - `sudo mkdir -p /opt`
+    - `sudo cp -r /path/to/trackball_remapper /opt/trackball_remapper`
+
+2. Install the unit file:
+    - `sudo cp /opt/trackball_remapper/trackball-remapper.service /etc/systemd/system/trackball-remapper.service`
+
+3. Reload systemd, enable on boot, and start now:
+    - `sudo systemctl daemon-reload`
+    - `sudo systemctl enable --now trackball-remapper.service`
+
+4. Check status/logs:
+    - `sudo systemctl status trackball-remapper.service`
+    - `journalctl -u trackball-remapper.service -f`
